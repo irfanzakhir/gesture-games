@@ -87,8 +87,8 @@ export class SteeringWheel extends BaseGame {
     let targetSteerAngle = 0;
 
     if (gestureState.detected) {
-      // handAngle: -45 to +45
-      targetSteerAngle = clamp(gestureState.handAngle, -60, 60);
+      // handAngle: -45 to +45 (inverted because camera is mirrored)
+      targetSteerAngle = clamp(-gestureState.handAngle, -60, 60);
 
       if (gestureState.gesture === 'OPEN_PALM') {
         this.isAccelerating = true;
