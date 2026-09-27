@@ -1,14 +1,18 @@
 import { drawText, drawRoundRect, drawCircle, drawProgressArc, drawEmoji, clearCanvas } from '../utils/canvas-helpers.js';
 import { Gesture } from '../gesture-engine.js';
+import { audio } from '../utils/audio.js';
 
 export class Menu {
   constructor(games) {
-    this.games = games;  // Array of game classes
+    this.games = games;
     this.hoveredIndex = -1;
     this.hoverTime = 0;
-    this.SELECT_HOLD_TIME = 1.5; // seconds to hold to select
+    this.SELECT_HOLD_TIME = 1.0; // reduced to 1 sec per request
     this.selectedCallback = null;
 
+    this.state = 'GAMES'; // 'GAMES' or 'DIFFICULTY'
+    this.selectedGameIndex = -1;
+    
     // UI layout params
     this.cardWidth = 200;
     this.cardHeight = 280;
@@ -29,6 +33,14 @@ export class Menu {
     const cursorX = gestureState.palmX * canvasWidth;
     const cursorY = gestureState.palmY * canvasHeight;
 
+    if (this.state === 'GAMES') {
+      this._updateGamesList(dt, cursorX, cursorY, gestureState, canvasWidth, canvasHeight);
+    } else if (this.state === 'DIFFICULTY') {
+      this._updateDifficulty(dt, cursorX, cursorY, gestureState, canvasWidth, canvasHeight);
+    }
+  }
+  
+  _updateGamesList(dt, cursorX, cursorY, gestureState, canvasWidth, canvasHeight) {
     const totalWidth = this.games.length * this.cardWidth + (this.games.length - 1) * this.gap;
     const startX = (canvasWidth - totalWidth) / 2;
     const startY = (canvasHeight - this.cardHeight) / 2;
@@ -50,9 +62,9 @@ export class Menu {
       if (this.hoveredIndex === currentlyHovered) {
         this.hoverTime += dt;
         if (this.hoverTime >= this.SELECT_HOLD_TIME) {
-          if (this.selectedCallback) {
-            this.selectedCallback(this.hoveredIndex);
-          }
+          audio.play('select');
+          this.selectedGameIndex = this.hoveredIndex;
+          this.state = 'DIFFICULTY';
           this.hoverTime = 0;
           this.hoveredIndex = -1;
         }
@@ -66,6 +78,65 @@ export class Menu {
     }
   }
 
+  _updateDifficulty(dt, cursorX, cursorY, gestureState, canvasWidth, canvasHeight) {
+    const diffs = ['EASY', 'MEDIUM', 'HARD'];
+    const multipliers = [0.7, 1.0, 1.5];
+    
+    const btnW = 200;
+    const btnH = 80;
+    const gap = 30;
+    const totalWidth = 3 * btnW + 2 * gap;
+    const startX = (canvasWidth - totalWidth) / 2;
+    const startY = canvasHeight / 2 - btnH / 2;
+
+    let currentlyHovered = -1;
+    for (let i = 0; i < 3; i++) {
+      const bx = startX + i * (btnW + gap);
+      const by = startY;
+      if (cursorX >= bx && cursorX <= bx + btnW && cursorY >= by && cursorY <= by + btnH) {
+        currentlyHovered = i;
+        break;
+      }
+    }
+    
+    // Allow point or open palm or pinch to select difficulty
+    const isGesturing = gestureState.gesture === Gesture.POINT || gestureState.gesture === Gesture.PINCH;
+
+    if (currentlyHovered !== -1 && isGesturing) {
+      if (this.hoveredIndex === currentlyHovered) {
+        this.hoverTime += dt;
+        if (this.hoverTime >= 1.0) { // 1 sec as requested
+          audio.play('win');
+          window.gameDifficultyStr = diffs[this.hoveredIndex];
+          window.gameDifficulty = multipliers[this.hoveredIndex];
+          
+          if (this.selectedCallback) {
+            this.selectedCallback(this.selectedGameIndex);
+          }
+          
+          // Reset menu for next time
+          this.state = 'GAMES';
+          this.hoverTime = 0;
+          this.hoveredIndex = -1;
+          this.selectedGameIndex = -1;
+        }
+      } else {
+        this.hoveredIndex = currentlyHovered;
+        this.hoverTime = 0;
+      }
+    } else {
+      this.hoveredIndex = currentlyHovered;
+      this.hoverTime = 0;
+    }
+    
+    // Allow canceling back to GAMES state with Thumbs Down
+    if (gestureState.gesture === Gesture.THUMBS_DOWN) {
+      this.state = 'GAMES';
+      this.hoverTime = 0;
+      this.hoveredIndex = -1;
+    }
+  }
+
   render(ctx, width, height, gestureState) {
     clearCanvas(ctx, width, height, '#0f0f23');
 
@@ -76,6 +147,48 @@ export class Menu {
       outlineColor: '#003344',
       outlineWidth: 4
     });
+
+    if (this.state === 'GAMES') {
+      this._renderGamesList(ctx, width, height);
+    } else if (this.state === 'DIFFICULTY') {
+      // Draw games list dimmed in background
+      ctx.globalAlpha = 0.3;
+      this._renderGamesList(ctx, width, height);
+      ctx.globalAlpha = 1.0;
+      
+      this._renderDifficulty(ctx, width, height);
+    }
+
+    // Cursor
+    if (gestureState && gestureState.detected) {
+      const cursorX = gestureState.palmX * width;
+      const cursorY = gestureState.palmY * height;
+
+      // Glow
+      ctx.save();
+      ctx.shadowColor = '#00ff88';
+      ctx.shadowBlur = 15;
+      drawCircle(ctx, cursorX, cursorY, 8, '#00ff88', '#ffffff', 2);
+      ctx.restore();
+
+      if (gestureState.gesture === Gesture.POINT) {
+        drawCircle(ctx, cursorX, cursorY, 14, 'rgba(0, 255, 136, 0.3)');
+      }
+    } else {
+      // "Show your hand" prompt
+      const pulse = 0.5 + Math.sin(Date.now() / 300) * 0.5;
+      drawText(ctx, '✋ Show your hand to navigate', width / 2, height - 120, {
+        font: 'bold 16px "Press Start 2P", monospace',
+        color: `rgba(255, 170, 0, ${pulse})`
+      });
+    }
+
+    if (this.state === 'GAMES') {
+      this._renderControlsPane(ctx, width, height);
+    }
+  }
+
+  _renderGamesList(ctx, width, height) {
     drawText(ctx, '☝️ Point at a game to select', width / 2, 130, {
       font: '14px "Press Start 2P", monospace',
       color: '#888888',
@@ -91,7 +204,7 @@ export class Menu {
       const cardX = startX + i * (this.cardWidth + this.gap);
       const cardY = startY;
 
-      const isHovered = this.hoveredIndex === i;
+      const isHovered = this.state === 'GAMES' && this.hoveredIndex === i;
       const scale = isHovered ? 1.05 : 1.0;
 
       ctx.save();
@@ -138,32 +251,53 @@ export class Menu {
 
       ctx.restore();
     }
+  }
 
-    // Cursor
-    if (gestureState && gestureState.detected) {
-      const cursorX = gestureState.palmX * width;
-      const cursorY = gestureState.palmY * height;
+  _renderDifficulty(ctx, width, height) {
+    // Overlay backdrop
+    ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
+    ctx.fillRect(0, 0, width, height);
 
-      // Glow
-      ctx.save();
-      ctx.shadowColor = '#00ff88';
-      ctx.shadowBlur = 15;
-      drawCircle(ctx, cursorX, cursorY, 8, '#00ff88', '#ffffff', 2);
-      ctx.restore();
+    drawText(ctx, 'CHOOSE DIFFICULTY', width / 2, height / 2 - 100, {
+      font: 'bold 24px "Press Start 2P", monospace',
+      color: '#ffffff',
+      outlineWidth: 3
+    });
+    drawText(ctx, 'Point to select | 👎 Thumbs Down to cancel', width / 2, height / 2 - 60, {
+      font: '12px "Press Start 2P", monospace',
+      color: '#aaaaaa'
+    });
 
-      if (gestureState.gesture === Gesture.POINT) {
-        drawCircle(ctx, cursorX, cursorY, 14, 'rgba(0, 255, 136, 0.3)');
-      }
-    } else {
-      // "Show your hand" prompt
-      const pulse = 0.5 + Math.sin(Date.now() / 300) * 0.5;
-      drawText(ctx, '✋ Show your hand to navigate', width / 2, height - 120, {
+    const diffs = ['EASY', 'MEDIUM', 'HARD'];
+    const colors = ['#44cc44', '#ffaa00', '#ff4444'];
+    
+    const btnW = 200;
+    const btnH = 80;
+    const gap = 30;
+    const totalWidth = 3 * btnW + 2 * gap;
+    const startX = (width - totalWidth) / 2;
+    const startY = height / 2 - btnH / 2;
+
+    for (let i = 0; i < 3; i++) {
+      const bx = startX + i * (btnW + gap);
+      const by = startY;
+      const isHovered = this.hoveredIndex === i;
+
+      drawRoundRect(ctx, bx, by, btnW, btnH, 10, isHovered ? '#333' : '#111', isHovered ? colors[i] : '#444');
+      
+      drawText(ctx, diffs[i], bx + btnW/2, by + btnH/2 + 6, {
         font: 'bold 16px "Press Start 2P", monospace',
-        color: `rgba(255, 170, 0, ${pulse})`
+        color: colors[i]
       });
-    }
 
-    // Controls Pane at the bottom
+      if (isHovered && this.hoverTime > 0) {
+        const progress = this.hoverTime / 1.0;
+        drawProgressArc(ctx, bx + btnW/2, by + btnH/2 - 25, 20, progress, colors[i]);
+      }
+    }
+  }
+
+  _renderControlsPane(ctx, width, height) {
     const paneWidth = 900;
     const paneHeight = 85;
     const paneX = (width - paneWidth) / 2;
@@ -178,44 +312,6 @@ export class Menu {
     });
     drawText(ctx, '🏎️ Car: TILT (Steer) PALM (Gas) FIST (Brake) | ⚙️ Global: 🤘 ROCK (Pause)', width / 2, paneY + 70, {
       font: '10px "Press Start 2P", monospace', color: '#00ffff'
-    });
-
-    // Difficulty Button
-    window.gameDifficultyStr = window.gameDifficultyStr || 'MEDIUM';
-    const diffBtnX = width - 220;
-    const diffBtnY = 20;
-    const diffBtnW = 200;
-    const diffBtnH = 50;
-
-    let hoverDiff = false;
-    if (gestureState && gestureState.detected) {
-      const cursorX = gestureState.palmX * width;
-      const cursorY = gestureState.palmY * height;
-      if (cursorX >= diffBtnX && cursorX <= diffBtnX + diffBtnW &&
-          cursorY >= diffBtnY && cursorY <= diffBtnY + diffBtnH) {
-          hoverDiff = true;
-      }
-      
-      // Toggle on pinch
-      if (hoverDiff && gestureState.gesture === Gesture.PINCH) {
-        if (!this.wasPinchingDiff) {
-          const diffs = ['EASY', 'MEDIUM', 'HARD'];
-          const multipliers = [0.7, 1.0, 1.5];
-          let idx = diffs.indexOf(window.gameDifficultyStr);
-          idx = (idx + 1) % diffs.length;
-          window.gameDifficultyStr = diffs[idx];
-          window.gameDifficulty = multipliers[idx];
-          this.wasPinchingDiff = true;
-        }
-      } else {
-        this.wasPinchingDiff = false;
-      }
-    }
-
-    drawRoundRect(ctx, diffBtnX, diffBtnY, diffBtnW, diffBtnH, 8, hoverDiff ? '#444' : '#222', hoverDiff ? '#00ff88' : '#555');
-    drawText(ctx, `DIFF: ${window.gameDifficultyStr}`, diffBtnX + diffBtnW/2, diffBtnY + 30, {
-      font: '12px "Press Start 2P", monospace',
-      color: hoverDiff ? '#00ff88' : '#fff'
     });
   }
 }
