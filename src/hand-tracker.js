@@ -11,7 +11,7 @@ export async function initHandTracker() {
   );
   const handLandmarker = await HandLandmarker.createFromOptions(vision, {
     baseOptions: {
-      modelAssetPath: '/assets/models/hand_landmarker.task',
+      modelAssetPath: import.meta.env.BASE_URL + 'assets/models/hand_landmarker.task',
       delegate: 'CPU'  // CPU for potato PCs, avoid GPU requirement
     },
     runningMode: 'VIDEO',
