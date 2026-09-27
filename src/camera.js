@@ -2,8 +2,9 @@
  * Camera configuration optimized for low-end PCs
  */
 const CAMERA_CONFIG = {
-  width: 640,
-  height: 480,
+  width: { ideal: 1280 },
+  height: { ideal: 720 },
+  aspectRatio: { ideal: 16/9 },
   facingMode: 'user',
   frameRate: { ideal: 30, max: 30 }
 };
@@ -47,7 +48,7 @@ export function drawPiP(ctx, video, canvasWidth, canvasHeight) {
   if (!video || video.readyState < 2) return;
 
   const pipWidth = 160;
-  const pipHeight = 120;
+  const pipHeight = 90; // 16:9 aspect ratio
   const margin = 16;
   
   const x = canvasWidth - pipWidth - margin;
