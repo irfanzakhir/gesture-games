@@ -235,13 +235,7 @@ export class Menu {
         outlineWidth: 2
       });
 
-      // Difficulty badge
-      const diffColor = meta.difficulty === 'easy' ? '#44cc44' : meta.difficulty === 'medium' ? '#ffaa00' : '#ff4444';
-      drawText(ctx, meta.difficulty.toUpperCase(), cardX + this.cardWidth / 2, cardY + 200, {
-        font: '10px "Press Start 2P", monospace',
-        color: diffColor,
-        outlineWidth: 2
-      });
+      // Removed difficulty badge as it's selected after clicking the game
 
       // Selection progress arc
       if (isHovered && this.hoverTime > 0) {

@@ -23,6 +23,9 @@ export async function initHandTracker() {
   return handLandmarker;
 }
 
+let lastVideoTime = -1;
+let cachedResult = { landmarks: null, handedness: null };
+
 /**
  * Detect hands in the current video frame.
  * @param {HandLandmarker} handLandmarker
@@ -31,12 +34,19 @@ export async function initHandTracker() {
  * @returns {{ landmarks: Array|null, handedness: string|null }}
  */
 export function detectHands(handLandmarker, video, timestamp) {
-  const results = handLandmarker.detectForVideo(video, timestamp);
-  if (results.landmarks && results.landmarks.length > 0) {
-    return {
-      landmarks: results.landmarks[0],  // 21 landmarks for first hand
-      handedness: results.handednesses?.[0]?.[0]?.categoryName || 'Right'
-    };
+  // OPTIMIZATION: Only run expensive AI inference if a new frame is available from the webcam
+  if (video.currentTime !== lastVideoTime) {
+    const results = handLandmarker.detectForVideo(video, timestamp);
+    lastVideoTime = video.currentTime;
+    
+    if (results.landmarks && results.landmarks.length > 0) {
+      cachedResult = {
+        landmarks: results.landmarks[0],  // 21 landmarks for first hand
+        handedness: results.handednesses?.[0]?.[0]?.categoryName || 'Right'
+      };
+    } else {
+      cachedResult = { landmarks: null, handedness: null };
+    }
   }
-  return { landmarks: null, handedness: null };
+  return cachedResult;
 }

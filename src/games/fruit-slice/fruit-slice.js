@@ -285,16 +285,17 @@ export class FruitSlice extends BaseGame {
       for (let i = 1; i < this.trail.length; i++) {
         ctx.lineTo(this.trail[i].x, this.trail[i].y);
       }
-      ctx.strokeStyle = 'rgba(255, 255, 255, 0.8)';
-      ctx.lineWidth = 6;
       ctx.lineCap = 'round';
       ctx.lineJoin = 'round';
       
-      // glowing effect
-      ctx.shadowColor = '#fff';
-      ctx.shadowBlur = 10;
+      // glowing effect via secondary stroke (much faster than shadowBlur)
+      ctx.lineWidth = 12;
+      ctx.strokeStyle = 'rgba(255, 255, 255, 0.2)';
       ctx.stroke();
-      ctx.shadowBlur = 0;
+      
+      ctx.lineWidth = 6;
+      ctx.strokeStyle = 'rgba(255, 255, 255, 0.8)';
+      ctx.stroke();
     }
 
     // Halves
