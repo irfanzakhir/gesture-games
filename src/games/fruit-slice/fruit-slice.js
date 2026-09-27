@@ -19,7 +19,7 @@ const STAR = { emoji: '⭐', points: 50, color: '#ffd700', size: 65, isStar: tru
  * Calculates distance from a point p to a line segment [v, w].
  */
 function distToSegment(p, v, w) {
-  const l2 = dist(v.x, v.y, w.x, w.y) ** 2;
+  const l2 = (w.x - v.x) ** 2 + (w.y - v.y) ** 2;  // squared distance (no sqrt needed)
   if (l2 === 0) return dist(p.x, p.y, v.x, v.y);
   let t = ((p.x - v.x) * (w.x - v.x) + (p.y - v.y) * (w.y - v.y)) / l2;
   t = Math.max(0, Math.min(1, t));
@@ -328,7 +328,7 @@ export class FruitSlice extends BaseGame {
     // Particles
     for (const p of this.particles) {
       ctx.globalAlpha = Math.max(0, p.life / p.maxLife);
-      drawCircle(ctx, p.x, p.y, p.size, { fill: p.color });
+      drawCircle(ctx, p.x, p.y, p.size, p.color);
     }
     ctx.globalAlpha = 1.0;
 

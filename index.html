@@ -19,7 +19,13 @@
       height: 100vh;
     }
     #webcam {
-      display: none;
+      /* Use invisible positioning instead of display:none — 
+         some browsers throttle/halt video frame decoding for hidden elements */
+      position: absolute;
+      width: 1px;
+      height: 1px;
+      opacity: 0;
+      pointer-events: none;
     }
     #loading {
       position: absolute;
@@ -56,7 +62,7 @@
     <div>Loading...</div>
   </div>
   <canvas id="gameCanvas"></canvas>
-  <video id="webcam" autoplay playsinline></video>
+  <video id="webcam" autoplay playsinline muted></video>
   
   <script type="module" src="/src/main.js"></script>
 </body>

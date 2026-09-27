@@ -108,7 +108,7 @@ async function main() {
         gameManager.update(dt, gestureState);
         if (gameManager.activeGame) {
           gameManager.activeGame.render(ctx);
-          hud.render(ctx, gameManager.activeGame, canvas.width, canvas.height, gestureState);
+          hud.render(ctx, gameManager.activeGame, canvas.width, canvas.height, gestureState, dt);
         }
         if (state === GameState.PAUSED) {
           drawPauseOverlay(ctx, canvas.width, canvas.height);
@@ -139,10 +139,8 @@ async function main() {
 function drawCalibrationScreen(ctx, w, h, gestureState) {
   const t = Date.now() / 1000;
   
-  // Big title with glow
+  // Big title
   ctx.save();
-  ctx.shadowColor = '#00ffff';
-  ctx.shadowBlur = 20;
   const scale = 1 + Math.sin(t * 2) * 0.05;
   ctx.translate(w / 2, h / 2 - 60);
   ctx.scale(scale, scale);
@@ -150,13 +148,13 @@ function drawCalibrationScreen(ctx, w, h, gestureState) {
     font: 'bold 56px "Press Start 2P", monospace',
     color: '#00ffff',
     outlineColor: '#003344',
-    outlineWidth: 4
+    outlineWidth: 6
   });
   drawText(ctx, 'GAMES', 0, 40, {
     font: 'bold 56px "Press Start 2P", monospace',
     color: '#ff44aa',
     outlineColor: '#440022',
-    outlineWidth: 4
+    outlineWidth: 6
   });
   ctx.restore();
 

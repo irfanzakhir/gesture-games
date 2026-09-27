@@ -21,13 +21,13 @@ export class HUD {
     }
   }
 
-  render(ctx, game, width, height, gestureState) {
+  render(ctx, game, width, height, gestureState, dt) {
     // Score pulse effect
     if (game.score !== this.lastScore) {
       this.scoreScale = 1.4;
       this.lastScore = game.score;
     }
-    this.scoreScale = Math.max(1, this.scoreScale - 0.03);
+    this.scoreScale = Math.max(1, this.scoreScale - 2.0 * (dt || 0.016));
 
     // Top-center: Score
     ctx.save();

@@ -60,6 +60,7 @@ class AudioManager {
     gain.gain.value = volume;
     source.connect(gain);
     gain.connect(this.ctx.destination);
+    source.onended = () => { source.disconnect(); gain.disconnect(); };
     source.start(0);
   }
 

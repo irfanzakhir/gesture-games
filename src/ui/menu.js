@@ -164,12 +164,9 @@ export class Menu {
       const cursorX = gestureState.palmX * width;
       const cursorY = gestureState.palmY * height;
 
-      // Glow
-      ctx.save();
-      ctx.shadowColor = '#00ff88';
-      ctx.shadowBlur = 15;
+      // Glow (double-circle technique instead of expensive shadowBlur)
+      drawCircle(ctx, cursorX, cursorY, 14, 'rgba(0, 255, 136, 0.25)');
       drawCircle(ctx, cursorX, cursorY, 8, '#00ff88', '#ffffff', 2);
-      ctx.restore();
 
       if (gestureState.gesture === Gesture.POINT) {
         drawCircle(ctx, cursorX, cursorY, 14, 'rgba(0, 255, 136, 0.3)');
@@ -218,12 +215,18 @@ export class Menu {
       gradient.addColorStop(1, '#1a1a2e');
 
       if (isHovered) {
-        ctx.shadowColor = meta.color || '#ffffff';
-        ctx.shadowBlur = 25;
+        // Thick colored border instead of expensive shadowBlur
       }
 
       drawRoundRect(ctx, cardX, cardY, this.cardWidth, this.cardHeight, 15, gradient, isHovered ? '#ffffff' : null);
-      ctx.shadowBlur = 0;
+      if (isHovered) {
+        // Draw a second outline for glow effect
+        ctx.strokeStyle = meta.color || '#ffffff';
+        ctx.lineWidth = 4;
+        ctx.beginPath();
+        ctx.roundRect(cardX - 3, cardY - 3, this.cardWidth + 6, this.cardHeight + 6, 17);
+        ctx.stroke();
+      }
 
       // Icon
       drawEmoji(ctx, meta.icon, cardX + this.cardWidth / 2, cardY + 80, 60);

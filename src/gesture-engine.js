@@ -36,15 +36,46 @@ export class GestureEngine {
     this.confirmedGesture = Gesture.NONE;
     this.GESTURE_HOLD_FRAMES = 3;  // Frames before confirming gesture
     
-    // Smoothing factor (lower = smoother but laggier)
-    this.SMOOTHING = 0.35;
+    // Smoothing: use adaptive EMA — faster when hand moves fast, smoother when slow
+    this.BASE_SMOOTHING = 0.45;    // base factor (higher = more responsive)
+    this.MIN_SMOOTHING = 0.25;     // minimum (smoothest, for slow/still hand)
+    this.MAX_SMOOTHING = 0.7;      // maximum (most responsive, for fast moves)
     
-    // Velocity tracking
+    // Velocity tracking (smoothed)
     this.velocityX = 0;
     this.velocityY = 0;
     
     // No hand detected counter
     this.framesWithoutHand = 0;
+    
+    // Pre-allocated return objects to avoid GC pressure
+    this._noHandResult = {
+      detected: false,
+      gesture: Gesture.NONE,
+      palmX: 0.5,
+      palmY: 0.5,
+      fingers: { thumb: false, index: false, middle: false, ring: false, pinky: false, count: 0 },
+      pinchDistance: 1,
+      handAngle: 0,
+      velocity: { x: 0, y: 0 },
+      rawLandmarks: null,
+      handedness: null,
+      framesWithoutHand: 0
+    };
+    this._handResult = {
+      detected: true,
+      gesture: Gesture.NONE,
+      palmX: 0.5,
+      palmY: 0.5,
+      fingers: { thumb: false, index: false, middle: false, ring: false, pinky: false, count: 0 },
+      pinchDistance: 1,
+      handAngle: 0,
+      velocity: { x: 0, y: 0 },
+      rawLandmarks: null,
+      handedness: null,
+      framesWithoutHand: 0
+    };
+    this._fingers = { thumb: false, index: false, middle: false, ring: false, pinky: false, count: 0 };
   }
 
   /**
@@ -57,19 +88,13 @@ export class GestureEngine {
   update(handResult, timestamp) {
     if (!handResult || !handResult.landmarks) {
       this.framesWithoutHand++;
-      return {
-        detected: false,
-        gesture: Gesture.NONE,
-        palmX: this.prevPalmX,
-        palmY: this.prevPalmY,
-        fingers: { thumb: false, index: false, middle: false, ring: false, pinky: false, count: 0 },
-        pinchDistance: 1,
-        handAngle: 0,
-        velocity: { x: 0, y: 0 },
-        rawLandmarks: null,
-        handedness: null,
-        framesWithoutHand: this.framesWithoutHand
-      };
+      const r = this._noHandResult;
+      r.palmX = this.prevPalmX;
+      r.palmY = this.prevPalmY;
+      r.velocity.x = 0;
+      r.velocity.y = 0;
+      r.framesWithoutHand = this.framesWithoutHand;
+      return r;
     }
 
     this.framesWithoutHand = 0;
@@ -81,28 +106,38 @@ export class GestureEngine {
     //    Mirror X so moving hand right = cursor right (camera is mirrored)
     const rawPalmX = 1 - (lm[LM.WRIST].x + lm[LM.MIDDLE_MCP].x) / 2;
     const rawPalmY = (lm[LM.WRIST].y + lm[LM.MIDDLE_MCP].y) / 2;
-    const palmX = ema(rawPalmX, this.prevPalmX, this.SMOOTHING);
-    const palmY = ema(rawPalmY, this.prevPalmY, this.SMOOTHING);
+    
+    // 2. Adaptive smoothing: compute raw velocity to choose smoothing factor
+    const rawVelX = (rawPalmX - this.prevPalmX) / dt;
+    const rawVelY = (rawPalmY - this.prevPalmY) / dt;
+    const speed = Math.sqrt(rawVelX * rawVelX + rawVelY * rawVelY);
+    
+    // Map speed to smoothing factor: fast hand = high factor (responsive), slow = low (smooth)
+    const adaptiveFactor = Math.min(this.MAX_SMOOTHING, Math.max(this.MIN_SMOOTHING, 
+      this.BASE_SMOOTHING + speed * 0.5));
+    
+    const palmX = ema(rawPalmX, this.prevPalmX, adaptiveFactor);
+    const palmY = ema(rawPalmY, this.prevPalmY, adaptiveFactor);
 
-    // 2. Calculate velocity
-    this.velocityX = (palmX - this.prevPalmX) / dt;
-    this.velocityY = (palmY - this.prevPalmY) / dt;
+    // 3. Smoothed velocity (using EMA on velocity itself for extra stability)
+    this.velocityX = ema((palmX - this.prevPalmX) / dt, this.velocityX, 0.4);
+    this.velocityY = ema((palmY - this.prevPalmY) / dt, this.velocityY, 0.4);
     this.prevPalmX = palmX;
     this.prevPalmY = palmY;
 
-    // 3. Detect finger extension states
-    const fingers = this._getFingerStates(lm);
+    // 4. Detect finger extension states (reuse object)
+    this._getFingerStates(lm);
 
-    // 4. Calculate pinch distance (thumb tip to index tip)
+    // 5. Calculate pinch distance (thumb tip to index tip)
     const pinchDistance = dist3D(lm[LM.THUMB_TIP], lm[LM.INDEX_TIP]);
 
-    // 5. Calculate hand angle (for steering)
+    // 6. Calculate hand angle (for steering)
     const handAngle = this._getHandAngle(lm);
 
-    // 6. Classify gesture
-    const rawGesture = this._classifyGesture(fingers, pinchDistance, handAngle, lm);
+    // 7. Classify gesture
+    const rawGesture = this._classifyGesture(this._fingers, pinchDistance, handAngle, lm);
     
-    // 7. Debounce gesture
+    // 8. Debounce gesture
     if (rawGesture === this.currentGesture) {
       this.gestureFrameCount++;
       if (this.gestureFrameCount >= this.GESTURE_HOLD_FRAMES) {
@@ -113,36 +148,32 @@ export class GestureEngine {
       this.gestureFrameCount = 1;
     }
 
-    return {
-      detected: true,
-      gesture: this.confirmedGesture,
-      palmX,
-      palmY,
-      fingers,
-      pinchDistance,
-      handAngle,
-      velocity: { x: this.velocityX, y: this.velocityY },
-      rawLandmarks: lm,
-      handedness: handResult.handedness,
-      framesWithoutHand: 0
-    };
+    // 9. Fill pre-allocated result object
+    const r = this._handResult;
+    r.gesture = this.confirmedGesture;
+    r.palmX = palmX;
+    r.palmY = palmY;
+    r.fingers = this._fingers;
+    r.pinchDistance = pinchDistance;
+    r.handAngle = handAngle;
+    r.velocity.x = this.velocityX;
+    r.velocity.y = this.velocityY;
+    r.rawLandmarks = lm;
+    r.handedness = handResult.handedness;
+    return r;
   }
 
   /**
-   * Detect which fingers are extended.
-   * Fingers: compare tip Y to PIP Y (tip above PIP = extended).
-   * Thumb: compare tip X distance from palm center.
+   * Detect which fingers are extended — mutates this._fingers in-place.
    */
   _getFingerStates(lm) {
-    const thumb = this._isThumbExtended(lm);
-    const index = lm[LM.INDEX_TIP].y < lm[LM.INDEX_PIP].y;
-    const middle = lm[LM.MIDDLE_TIP].y < lm[LM.MIDDLE_PIP].y;
-    const ring = lm[LM.RING_TIP].y < lm[LM.RING_PIP].y;
-    const pinky = lm[LM.PINKY_TIP].y < lm[LM.PINKY_PIP].y;
-    return {
-      thumb, index, middle, ring, pinky,
-      count: [thumb, index, middle, ring, pinky].filter(Boolean).length
-    };
+    const f = this._fingers;
+    f.thumb = this._isThumbExtended(lm);
+    f.index = lm[LM.INDEX_TIP].y < lm[LM.INDEX_PIP].y;
+    f.middle = lm[LM.MIDDLE_TIP].y < lm[LM.MIDDLE_PIP].y;
+    f.ring = lm[LM.RING_TIP].y < lm[LM.RING_PIP].y;
+    f.pinky = lm[LM.PINKY_TIP].y < lm[LM.PINKY_PIP].y;
+    f.count = (f.thumb ? 1 : 0) + (f.index ? 1 : 0) + (f.middle ? 1 : 0) + (f.ring ? 1 : 0) + (f.pinky ? 1 : 0);
   }
 
   _isThumbExtended(lm) {

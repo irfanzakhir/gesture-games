@@ -52,6 +52,7 @@ export class SteeringWheel extends BaseGame {
     this.particles = [];
     
     this.distanceScore = 0;
+    this.collectedPoints = 0;
     this.roadWidth = this.width * 0.45;
 
     this.isBraking = false;
@@ -59,6 +60,7 @@ export class SteeringWheel extends BaseGame {
   }
 
   async init() {
+    await super.init();
     this.score = 0;
     this.timeLeft = SteeringWheel.meta.duration;
     this.isRunning = true;
@@ -71,6 +73,7 @@ export class SteeringWheel extends BaseGame {
     this.obstacles = [];
     this.particles = [];
     this.distanceScore = 0;
+    this.collectedPoints = 0;
     this.roadWidth = this.width * 0.45;
   }
 
@@ -112,7 +115,7 @@ export class SteeringWheel extends BaseGame {
     // Update scrolling
     this.scrollY += this.speed * dt;
     this.distanceScore += (this.speed * dt) * 0.05; // 0.05 points per pixel
-    this.score = Math.floor(this.distanceScore) + this.obstacles.reduce((acc, obs) => acc + (obs.collected ? obs.type.points : 0), 0);
+    this.score = Math.floor(this.distanceScore) + this.collectedPoints;
 
     // Smooth steering
     this.steerAngle = lerp(this.steerAngle, targetSteerAngle, 10 * dt);
@@ -197,7 +200,7 @@ export class SteeringWheel extends BaseGame {
               audio.play('coin');
             }
             if (obs.type.points > 0) {
-              this.score += obs.type.points;
+              this.collectedPoints += obs.type.points;
             }
             this._createExplosion(obs.x, obs.screenY, '#f1c40f');
           }
@@ -326,29 +329,67 @@ export class SteeringWheel extends BaseGame {
 
   _drawRoad(ctx) {
     const roadW = this.roadWidth;
+    const stripHeight = 20; // Larger strips for fewer iterations
+    const h = this.height;
     
-    // Draw in thick horizontal strips for performance
-    const stripHeight = 10;
+    // Build road as a single polygon path — MUCH faster than 100+ fillRects
+    // Left edge
+    ctx.beginPath();
+    let firstCenter = this._getRoadCenterX(this.scrollY + h);
+    ctx.moveTo(firstCenter - roadW / 2, h);
     
-    for (let screenY = 0; screenY <= this.height; screenY += stripHeight) {
-      const worldY = this.scrollY + (this.height - screenY);
+    for (let screenY = h; screenY >= 0; screenY -= stripHeight) {
+      const worldY = this.scrollY + (h - screenY);
       const centerX = this._getRoadCenterX(worldY);
-      
-      // Road surface
-      ctx.fillStyle = '#555555';
-      ctx.fillRect(centerX - roadW/2, screenY, roadW, stripHeight + 1);
-      
-      // Edge lines
-      ctx.fillStyle = '#ffffff';
-      ctx.fillRect(centerX - roadW/2, screenY, 4, stripHeight + 1);
-      ctx.fillRect(centerX + roadW/2 - 4, screenY, 4, stripHeight + 1);
-      
-      // Center dashed line
-      if ((screenY + this.dashOffset) % 40 < 20) {
-        ctx.fillStyle = '#ffffff';
-        ctx.fillRect(centerX - 2, screenY, 4, stripHeight + 1);
-      }
+      ctx.lineTo(centerX - roadW / 2, screenY);
     }
+    // Right edge (go back down)
+    for (let screenY = 0; screenY <= h; screenY += stripHeight) {
+      const worldY = this.scrollY + (h - screenY);
+      const centerX = this._getRoadCenterX(worldY);
+      ctx.lineTo(centerX + roadW / 2, screenY);
+    }
+    ctx.closePath();
+    ctx.fillStyle = '#555555';
+    ctx.fill();
+    
+    // Edge lines and center dashes (draw as thin paths)
+    ctx.strokeStyle = '#ffffff';
+    ctx.lineWidth = 4;
+    
+    // Left edge line
+    ctx.beginPath();
+    for (let screenY = h; screenY >= 0; screenY -= stripHeight) {
+      const worldY = this.scrollY + (h - screenY);
+      const cx = this._getRoadCenterX(worldY);
+      if (screenY === h) ctx.moveTo(cx - roadW / 2, screenY);
+      else ctx.lineTo(cx - roadW / 2, screenY);
+    }
+    ctx.stroke();
+    
+    // Right edge line
+    ctx.beginPath();
+    for (let screenY = h; screenY >= 0; screenY -= stripHeight) {
+      const worldY = this.scrollY + (h - screenY);
+      const cx = this._getRoadCenterX(worldY);
+      if (screenY === h) ctx.moveTo(cx + roadW / 2, screenY);
+      else ctx.lineTo(cx + roadW / 2, screenY);
+    }
+    ctx.stroke();
+    
+    // Center dashed line
+    ctx.lineWidth = 3;
+    ctx.setLineDash([20, 20]);
+    ctx.lineDashOffset = -this.dashOffset;
+    ctx.beginPath();
+    for (let screenY = h; screenY >= 0; screenY -= stripHeight) {
+      const worldY = this.scrollY + (h - screenY);
+      const cx = this._getRoadCenterX(worldY);
+      if (screenY === h) ctx.moveTo(cx, screenY);
+      else ctx.lineTo(cx, screenY);
+    }
+    ctx.stroke();
+    ctx.setLineDash([]);
   }
 
   _drawCar(ctx, x, y, angle) {
@@ -364,14 +405,14 @@ export class SteeringWheel extends BaseGame {
     ctx.roundRect(-w/2 + 5, -h/2 + 5, w, h, 5);
     ctx.fill();
     
-    // Brake lights glow
+    // Brake lights (no shadowBlur — use bright color directly)
     if (this.isBraking) {
-      ctx.shadowColor = '#ff0000';
-      ctx.shadowBlur = 15;
-      ctx.fillStyle = '#ff0000';
+      ctx.fillStyle = '#ff4444';
       ctx.fillRect(-w/2 + 2, h/2 - 2, 8, 4);
       ctx.fillRect(w/2 - 10, h/2 - 2, 8, 4);
-      ctx.shadowBlur = 0;
+      ctx.fillStyle = '#ff0000';
+      ctx.fillRect(-w/2 + 3, h/2 - 1, 6, 2);
+      ctx.fillRect(w/2 - 9, h/2 - 1, 6, 2);
     }
 
     // Body
@@ -471,8 +512,6 @@ export class SteeringWheel extends BaseGame {
   }
 
   gameOver() {
-    this.isGameOver = true;
-    this.isRunning = false;
-    // BaseGame normally handles high score logic if implemented there
+    super.gameOver();
   }
 }

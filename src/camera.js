@@ -1,10 +1,13 @@
 /**
- * Camera configuration optimized for low-end PCs
+ * Camera configuration optimized for low-end PCs.
+ * 640x360 is 16:9 and is the sweet spot: MediaPipe internally
+ * downscales larger resolutions anyway, so 720p just wastes
+ * CPU cycles decoding bigger frames for zero tracking benefit.
  */
 const CAMERA_CONFIG = {
-  width: { ideal: 1280 },
-  height: { ideal: 720 },
-  aspectRatio: { ideal: 16/9 },
+  width: { ideal: 640 },
+  height: { ideal: 360 },
+  aspectRatio: { ideal: 16 / 9 },
   facingMode: 'user',
   frameRate: { ideal: 30, max: 30 }
 };
@@ -56,7 +59,7 @@ export function drawPiP(ctx, video, canvasWidth, canvasHeight) {
 
   ctx.save();
   
-  // Draw a subtle border
+  // Draw a subtle border (no shadowBlur — just a solid stroke)
   ctx.strokeStyle = 'rgba(255, 255, 255, 0.5)';
   ctx.lineWidth = 2;
   ctx.strokeRect(x - 1, y - 1, pipWidth + 2, pipHeight + 2);

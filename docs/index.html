@@ -19,7 +19,13 @@
       height: 100vh;
     }
     #webcam {
-      display: none;
+      /* Use invisible positioning instead of display:none — 
+         some browsers throttle/halt video frame decoding for hidden elements */
+      position: absolute;
+      width: 1px;
+      height: 1px;
+      opacity: 0;
+      pointer-events: none;
     }
     #loading {
       position: absolute;
@@ -49,7 +55,7 @@
       100% { transform: rotate(360deg); }
     }
   </style>
-  <script type="module" crossorigin src="/gesture-games/assets/index-z7lkX5DX.js"></script>
+  <script type="module" crossorigin src="/gesture-games/assets/index-Dr3iY_-z.js"></script>
 </head>
 <body>
   <div id="loading">
@@ -57,7 +63,7 @@
     <div>Loading...</div>
   </div>
   <canvas id="gameCanvas"></canvas>
-  <video id="webcam" autoplay playsinline></video>
+  <video id="webcam" autoplay playsinline muted></video>
   
 </body>
 </html>
