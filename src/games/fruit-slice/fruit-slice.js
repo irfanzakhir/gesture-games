@@ -73,13 +73,16 @@ export class FruitSlice extends BaseGame {
     
     const timeToPeak = randFloat(1.8, 2.5); // seconds (increased to slow down fruits)
     
-    const vy = -Math.abs(y - targetY) * 2 / timeToPeak;
+    const D = Math.abs(y - targetY);
+    const vy = -D * 2 / timeToPeak;
+    const gravity = (D * 2) / (timeToPeak * timeToPeak);
     const vx = (targetX - x) / timeToPeak;
     
     this.fruits.push({
       ...type,
       x, y,
       vx, vy,
+      gravity,
       rotation: randFloat(0, Math.PI * 2),
       rotSpeed: randFloat(-3, 3),
       radius: type.size / 2,
@@ -161,7 +164,7 @@ export class FruitSlice extends BaseGame {
       const f = this.fruits[i];
       f.x += f.vx * scaledDt;
       f.y += f.vy * scaledDt;
-      f.vy += gravity;
+      f.vy += f.gravity * scaledDt;
       f.rotation += f.rotSpeed * scaledDt;
 
       // Miss
@@ -179,7 +182,7 @@ export class FruitSlice extends BaseGame {
       const h = this.halves[i];
       h.x += h.vx * scaledDt;
       h.y += h.vy * scaledDt;
-      h.vy += gravity;
+      h.vy += (h.gravity || 800) * scaledDt;
       h.rotation += h.rotSpeed * scaledDt;
       h.life -= scaledDt;
       if (h.life <= 0) this.halves.splice(i, 1);
