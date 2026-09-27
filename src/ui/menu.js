@@ -157,10 +157,27 @@ export class Menu {
     } else {
       // "Show your hand" prompt
       const pulse = 0.5 + Math.sin(Date.now() / 300) * 0.5;
-      drawText(ctx, '✋ Show your hand to navigate', width / 2, height - 60, {
+      drawText(ctx, '✋ Show your hand to navigate', width / 2, height - 120, {
         font: 'bold 16px "Press Start 2P", monospace',
         color: `rgba(255, 170, 0, ${pulse})`
       });
     }
+
+    // Controls Pane at the bottom
+    const paneWidth = 900;
+    const paneHeight = 85;
+    const paneX = (width - paneWidth) / 2;
+    const paneY = height - paneHeight - 20;
+
+    drawRoundRect(ctx, paneX, paneY, paneWidth, paneHeight, 10, 'rgba(20, 20, 40, 0.8)', '#00ff88');
+
+    drawText(ctx, '🎮 QUICK CONTROLS', width / 2, paneY + 25, { font: '12px "Press Start 2P"', color: '#ffffff' });
+
+    drawText(ctx, '🎈 Balloon: PINCH | 🍉 Slice: FAST SWIPE | ✊ RPS: FIST/PALM/PEACE', width / 2, paneY + 50, {
+      font: '10px "Press Start 2P", monospace', color: '#00ffff'
+    });
+    drawText(ctx, '🏎️ Car: TILT (Steer) PALM (Gas) FIST (Brake) | ⚙️ Global: 🤘 ROCK (Pause)', width / 2, paneY + 70, {
+      font: '10px "Press Start 2P", monospace', color: '#00ffff'
+    });
   }
 }
