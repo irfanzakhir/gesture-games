@@ -215,8 +215,8 @@ export class FruitSlice extends BaseGame {
       
       this.trail.push({ x: px, y: py, life: 0.3 }); // increased trail life
 
-      // Trail intersection checks if velocity is high enough
-      if (velMag > 0.8 && this.trail.length >= 2) { // lowered from 1.5 to 0.8 to make cutting easier
+      // Trail intersection checks if velocity is high enough (0.1 = very slow swipe)
+      if (velMag > 0.1 && this.trail.length >= 2) { 
         const p1 = this.trail[this.trail.length - 2];
         const p2 = this.trail[this.trail.length - 1];
 
