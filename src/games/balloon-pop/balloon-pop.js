@@ -1,6 +1,7 @@
 import { BaseGame } from '../_base-game.js';
 import { randInt, randFloat, dist, clamp, circlesOverlap } from '../../utils/math.js';
 import { drawText, drawCircle, drawEmoji, clearCanvas } from '../../utils/canvas-helpers.js';
+import { audio } from '../../utils/audio.js';
 
 // Balloon types
 const BalloonType = {
@@ -161,6 +162,7 @@ export class BalloonPop extends BaseGame {
           this.lives--;
           if (this.lives <= 0) {
             this.lives = 0;
+            audio.play('gameOver');
             this.gameOver();
             return;
           }
@@ -235,16 +237,19 @@ export class BalloonPop extends BaseGame {
     // Score based on type
     switch (balloon.type) {
       case BalloonType.REGULAR:
+        audio.play('pop');
         this.score += 10;
         this.comboCount++;
         this.comboTimer = 2;
         break;
       case BalloonType.GOLD:
+        audio.play('coin');
         this.score += 30;
         this.comboCount++;
         this.comboTimer = 2;
         break;
       case BalloonType.BOMB:
+        audio.play('bomb');
         this.score = Math.max(0, this.score - 20);
         this.penaltyFlash = 1;
         this.comboCount = 0;

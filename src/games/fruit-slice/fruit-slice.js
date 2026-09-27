@@ -1,6 +1,7 @@
 import { BaseGame } from '../_base-game.js';
 import { randInt, randFloat, dist, clamp } from '../../utils/math.js';
 import { drawText, drawCircle, clearCanvas } from '../../utils/canvas-helpers.js';
+import { audio } from '../../utils/audio.js';
 
 const FRUITS = [
   { emoji: '🍎', points: 10, color: '#ff4444', size: 70 },
@@ -71,7 +72,8 @@ export class FruitSlice extends BaseGame {
     const targetX = this.width / 2 + randFloat(-100, 100);
     const targetY = this.height * 0.2;
     
-    const timeToPeak = randFloat(1.8, 2.5); // seconds (increased to slow down fruits)
+    const diff = window.gameDifficulty || 1.0;
+    const timeToPeak = randFloat(1.8, 2.5) / diff; // seconds (adjusted by difficulty)
     
     const D = Math.abs(y - targetY);
     const vy = -D * 2 / timeToPeak;
@@ -154,9 +156,10 @@ export class FruitSlice extends BaseGame {
     // Spawn logic
     this.spawnTimer -= scaledDt;
     if (this.spawnTimer <= 0) {
-      const numToSpawn = randInt(1, 3);
+      const diff = window.gameDifficulty || 1.0;
+      const numToSpawn = randInt(1, Math.max(1, Math.floor(3 * diff)));
       for (let i=0; i<numToSpawn; i++) this.spawnFruit();
-      this.spawnTimer = randFloat(1.0, 3.0);
+      this.spawnTimer = randFloat(1.0, 3.0) / diff;
     }
 
     // Update fruits
@@ -171,7 +174,10 @@ export class FruitSlice extends BaseGame {
       if (f.y > this.height + f.radius * 2 && f.vy > 0) {
         if (!f.isBomb && !f.isStar) {
           this.lives--;
-          if (this.lives <= 0) this.gameOver();
+          if (this.lives <= 0) {
+            audio.play('gameOver');
+            this.gameOver();
+          }
         }
         this.fruits.splice(i, 1);
       }
@@ -227,15 +233,19 @@ export class FruitSlice extends BaseGame {
           if (distToFruit <= f.radius * 1.5) {
             // Sliced!
             if (f.isBomb) {
+              audio.play('bomb');
               this.score = Math.max(0, this.score + f.points);
               this.screenFlash = 1.0;
               this.createFloatingText('BOMB!', f.x, f.y, '#ff0000');
             } else {
+              audio.play('slice');
               this.score += f.points;
               this.comboFruits++;
+              if (this.comboFruits > 2) audio.play('combo');
               this.comboTimer = 1.0;
               
               if (f.isStar) {
+                audio.play('win');
                 this.slowMoTimer = 2.0;
                 this.createFloatingText('SLOW MO!', f.x, f.y, f.color);
               } else {

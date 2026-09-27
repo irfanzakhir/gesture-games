@@ -1,6 +1,7 @@
 import { BaseGame } from '../_base-game.js';
 import { lerp, clamp, randInt, randFloat, dist } from '../../utils/math.js';
 import { drawText, drawCircle, drawRoundRect, clearCanvas } from '../../utils/canvas-helpers.js';
+import { audio } from '../../utils/audio.js';
 
 const ObstacleType = {
   ROCK: { emoji: '🪨', points: 0, damage: true, radius: 15 },
@@ -29,7 +30,8 @@ export class SteeringWheel extends BaseGame {
     this.carX = this.width / 2;
     this.carY = this.height - 100;
     this.speed = 0;
-    this.maxSpeed = 500;
+    const diff = window.gameDifficulty || 1.0;
+    this.maxSpeed = 500 * diff;
     this.minSpeed = 0;
     this.scrollY = 0;
     this.steerAngle = 0;
@@ -77,6 +79,7 @@ export class SteeringWheel extends BaseGame {
 
     this.timeLeft -= dt;
     if (this.timeLeft <= 0 || this.lives <= 0) {
+      audio.play('gameOver');
       this.gameOver();
       return;
     }
@@ -179,6 +182,7 @@ export class SteeringWheel extends BaseGame {
         const d = dist(this.carX, this.carY, obs.x, obs.screenY);
         if (d < 25 + obs.type.radius) {
           if (obs.type.damage) {
+            audio.play('crash');
             obs.hit = true;
             this.lives -= 1;
             this.speed = 0;
@@ -187,7 +191,10 @@ export class SteeringWheel extends BaseGame {
           } else {
             obs.collected = true;
             if (obs.type.timeBonus) {
+              audio.play('win');
               this.timeLeft += obs.type.timeBonus;
+            } else {
+              audio.play('coin');
             }
             if (obs.type.points > 0) {
               this.score += obs.type.points;

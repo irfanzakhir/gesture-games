@@ -8,7 +8,7 @@ export class Menu {
     this.hoverTime = 0;
     this.SELECT_HOLD_TIME = 1.5; // seconds to hold to select
     this.selectedCallback = null;
-    
+
     // UI layout params
     this.cardWidth = 200;
     this.cardHeight = 280;
@@ -40,7 +40,7 @@ export class Menu {
       const cardY = startY;
 
       if (cursorX >= cardX && cursorX <= cardX + this.cardWidth &&
-          cursorY >= cardY && cursorY <= cardY + this.cardHeight) {
+        cursorY >= cardY && cursorY <= cardY + this.cardHeight) {
         currentlyHovered = i;
         break;
       }
@@ -68,7 +68,7 @@ export class Menu {
 
   render(ctx, width, height, gestureState) {
     clearCanvas(ctx, width, height, '#0f0f23');
-    
+
     // Title
     drawText(ctx, 'GESTURE GAMES', width / 2, 70, {
       font: 'bold 40px "Press Start 2P", monospace',
@@ -81,7 +81,7 @@ export class Menu {
       color: '#888888',
       outlineWidth: 2
     });
-    
+
     const totalWidth = this.games.length * this.cardWidth + (this.games.length - 1) * this.gap;
     const startX = (width - totalWidth) / 2;
     const startY = (height - this.cardHeight) / 2;
@@ -93,7 +93,7 @@ export class Menu {
 
       const isHovered = this.hoveredIndex === i;
       const scale = isHovered ? 1.05 : 1.0;
-      
+
       ctx.save();
       ctx.translate(cardX + this.cardWidth / 2, cardY + this.cardHeight / 2);
       ctx.scale(scale, scale);
@@ -103,7 +103,7 @@ export class Menu {
       const gradient = ctx.createLinearGradient(cardX, cardY, cardX, cardY + this.cardHeight);
       gradient.addColorStop(0, meta.color || '#444444');
       gradient.addColorStop(1, '#1a1a2e');
-      
+
       if (isHovered) {
         ctx.shadowColor = meta.color || '#ffffff';
         ctx.shadowBlur = 25;
@@ -114,7 +114,7 @@ export class Menu {
 
       // Icon
       drawEmoji(ctx, meta.icon, cardX + this.cardWidth / 2, cardY + 80, 60);
-      
+
       // Name
       drawText(ctx, meta.name, cardX + this.cardWidth / 2, cardY + 160, {
         font: 'bold 14px "Press Start 2P", monospace',
@@ -143,14 +143,14 @@ export class Menu {
     if (gestureState && gestureState.detected) {
       const cursorX = gestureState.palmX * width;
       const cursorY = gestureState.palmY * height;
-      
+
       // Glow
       ctx.save();
       ctx.shadowColor = '#00ff88';
       ctx.shadowBlur = 15;
       drawCircle(ctx, cursorX, cursorY, 8, '#00ff88', '#ffffff', 2);
       ctx.restore();
-      
+
       if (gestureState.gesture === Gesture.POINT) {
         drawCircle(ctx, cursorX, cursorY, 14, 'rgba(0, 255, 136, 0.3)');
       }
@@ -173,11 +173,49 @@ export class Menu {
 
     drawText(ctx, '🎮 QUICK CONTROLS', width / 2, paneY + 25, { font: '12px "Press Start 2P"', color: '#ffffff' });
 
-    drawText(ctx, '🎈 Balloon: PINCH | 🍉 Slice: FAST SWIPE | ✊ RPS: FIST/PALM/PEACE', width / 2, paneY + 50, {
+    drawText(ctx, '🎈 Balloon: point | 🍉 Slice: FAST SWIPE | ✊ RPS: FIST/PALM/PEACE', width / 2, paneY + 50, {
       font: '10px "Press Start 2P", monospace', color: '#00ffff'
     });
     drawText(ctx, '🏎️ Car: TILT (Steer) PALM (Gas) FIST (Brake) | ⚙️ Global: 🤘 ROCK (Pause)', width / 2, paneY + 70, {
       font: '10px "Press Start 2P", monospace', color: '#00ffff'
+    });
+
+    // Difficulty Button
+    window.gameDifficultyStr = window.gameDifficultyStr || 'MEDIUM';
+    const diffBtnX = width - 220;
+    const diffBtnY = 20;
+    const diffBtnW = 200;
+    const diffBtnH = 50;
+
+    let hoverDiff = false;
+    if (gestureState && gestureState.detected) {
+      const cursorX = gestureState.palmX * width;
+      const cursorY = gestureState.palmY * height;
+      if (cursorX >= diffBtnX && cursorX <= diffBtnX + diffBtnW &&
+          cursorY >= diffBtnY && cursorY <= diffBtnY + diffBtnH) {
+          hoverDiff = true;
+      }
+      
+      // Toggle on pinch
+      if (hoverDiff && gestureState.gesture === Gesture.PINCH) {
+        if (!this.wasPinchingDiff) {
+          const diffs = ['EASY', 'MEDIUM', 'HARD'];
+          const multipliers = [0.7, 1.0, 1.5];
+          let idx = diffs.indexOf(window.gameDifficultyStr);
+          idx = (idx + 1) % diffs.length;
+          window.gameDifficultyStr = diffs[idx];
+          window.gameDifficulty = multipliers[idx];
+          this.wasPinchingDiff = true;
+        }
+      } else {
+        this.wasPinchingDiff = false;
+      }
+    }
+
+    drawRoundRect(ctx, diffBtnX, diffBtnY, diffBtnW, diffBtnH, 8, hoverDiff ? '#444' : '#222', hoverDiff ? '#00ff88' : '#555');
+    drawText(ctx, `DIFF: ${window.gameDifficultyStr}`, diffBtnX + diffBtnW/2, diffBtnY + 30, {
+      font: '12px "Press Start 2P", monospace',
+      color: hoverDiff ? '#00ff88' : '#fff'
     });
   }
 }

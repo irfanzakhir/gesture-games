@@ -1,6 +1,7 @@
 import { BaseGame } from '../_base-game.js';
 import { randInt } from '../../utils/math.js';
 import { drawText, drawCircle, drawEmoji, clearCanvas, drawRoundRect } from '../../utils/canvas-helpers.js';
+import { audio } from '../../utils/audio.js';
 
 const RPS = { ROCK: 'rock', PAPER: 'paper', SCISSORS: 'scissors' };
 
@@ -108,7 +109,27 @@ export class RockPaperScissors extends BaseGame {
   }
 
   getCpuChoice() {
-    // Avoid repeating 3 times
+    const diff = window.gameDifficulty || 1.0; // 0.7 = Easy, 1.0 = Normal, 1.5 = Hard
+    
+    // Easy mode: CPU occasionally intentionally loses (picks what player beats)
+    // Hard mode: CPU occasionally intentionally wins (picks what beats player)
+    
+    if (this.playerChoice) {
+      if (diff === 0.7 && Math.random() < 0.4) {
+        // Lose on purpose 40% of time
+        if (this.playerChoice === RPS.ROCK) return RPS.SCISSORS;
+        if (this.playerChoice === RPS.PAPER) return RPS.ROCK;
+        if (this.playerChoice === RPS.SCISSORS) return RPS.PAPER;
+      }
+      if (diff === 1.5 && Math.random() < 0.5) {
+        // Win on purpose 50% of time
+        if (this.playerChoice === RPS.ROCK) return RPS.PAPER;
+        if (this.playerChoice === RPS.PAPER) return RPS.SCISSORS;
+        if (this.playerChoice === RPS.SCISSORS) return RPS.ROCK;
+      }
+    }
+
+    // Normal logic: Avoid repeating 3 times
     if (this.cpuHistory.length >= 2) {
       const last = this.cpuHistory[this.cpuHistory.length - 1];
       const prev = this.cpuHistory[this.cpuHistory.length - 2];
@@ -131,9 +152,11 @@ export class RockPaperScissors extends BaseGame {
       if (currentRps === this.detectedGesture && currentRps !== null) {
         this.gestureStableTime += dt;
         if (this.gestureStableTime >= this.GESTURE_CONFIRM_TIME) {
+          audio.play('select');
           this.playerChoice = currentRps;
           this.phase = Phase.COUNTDOWN;
           this.phaseTimer = 3.0; // 3 second countdown
+          this.lastCountdown = 4;
         }
       } else {
         this.detectedGesture = currentRps;
@@ -144,12 +167,18 @@ export class RockPaperScissors extends BaseGame {
       this.phaseTimer -= dt;
       this.countdownValue = Math.ceil(this.phaseTimer);
       
+      if (this.countdownValue !== this.lastCountdown && this.countdownValue > 0) {
+        audio.play('countdown');
+        this.lastCountdown = this.countdownValue;
+      }
+
       // Dramatic shake during the last second
       if (this.phaseTimer < 1.0) {
         this.shakeOffset = Math.sin(this.phaseTimer * 40) * 5;
       }
 
       if (this.phaseTimer <= 0) {
+        audio.play('countdownFinal');
         this.shakeOffset = 0;
         this.cpuChoice = this.getCpuChoice();
         this.cpuHistory.push(this.cpuChoice);
@@ -169,12 +198,15 @@ export class RockPaperScissors extends BaseGame {
         this.history.push({ player: this.playerChoice, cpu: this.cpuChoice, result: this.roundResult });
         
         if (this.roundResult === 'win') {
+          audio.play('win');
           this.playerWins++;
           this.score += 20;
         } else if (this.roundResult === 'draw') {
+          audio.play('coin');
           this.draws++;
           this.score += 5;
         } else {
+          audio.play('lose');
           this.cpuWins++;
         }
         
@@ -207,6 +239,7 @@ export class RockPaperScissors extends BaseGame {
     else if (this.phase === Phase.FINAL) {
       this.phaseTimer -= dt;
       if (this.phaseTimer <= 0) {
+        audio.play('gameOver');
         this.gameOver();
       }
     }
